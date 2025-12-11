@@ -10,7 +10,21 @@ import RateCardsPage from './pages/RateCardsPage'
 import WarehouseActivityPage from './pages/WarehouseActivityPage'
 import BillingPage from './pages/BillingPage'
 
-const BROKER_URL = 'wss://13.229.82.59:8083/mqtt'
+// 动态生成 MQTT Broker URL
+const generateBrokerURL = () => {
+  const protocol = window.location.protocol // 'http:' 或 'https:'
+  const brokerHost = '13.229.82.59'
+  const wsPort = 8083
+  const wssPort = 8084
+  
+  if (protocol === 'https:') {
+    return `wss://${brokerHost}:${wssPort}/mqtt`
+  } else {
+    return `ws://${brokerHost}:${wsPort}/mqtt`
+  }
+}
+
+const BROKER_URL = generateBrokerURL()
 
 const TOPIC_INBOUND = 'Henkel/Shanghai/Logistics/Costing/State/Inbound_List'
 const TOPIC_APPROVAL = 'Henkel/Shanghai/Logistics/Costing/State/Approval_List'
