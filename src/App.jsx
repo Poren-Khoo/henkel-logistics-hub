@@ -13,14 +13,11 @@ import BillingPage from './pages/BillingPage'
 // 动态生成 MQTT Broker URL
 const generateBrokerURL = () => {
   const protocol = window.location.protocol // 'http:' 或 'https:'
-  const brokerHost = '13.229.82.59'
-  const wsPort = 8083
-  const wssPort = 8084
   
   if (protocol === 'https:') {
-    return `wss://${brokerHost}:${wssPort}/mqtt`
+    return 'wss://supos-ce-instance1.supos.app:8084/mqtt'
   } else {
-    return `ws://${brokerHost}:${wsPort}/mqtt`
+    return 'ws://13.229.82.59:8083/mqtt'
   }
 }
 
