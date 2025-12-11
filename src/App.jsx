@@ -71,16 +71,38 @@ function App() {
     })
 
     mqttClient.on('message', (topic, message) => {
-      try {
-        const payload = JSON.parse(message.toString())
-        if (topic === TOPIC_INBOUND && Array.isArray(payload)) setInboundList(payload)
-        if (topic === TOPIC_APPROVAL && Array.isArray(payload)) setApprovalList(payload)
-        if (topic === TOPIC_HISTORY) {
-            const newItem = { ...payload, supplier: "Warehouse Supplier A" } 
-            setHistoryList(prev => [newItem, ...prev])
-        }
-      } catch (error) { console.error(error) }
-    })
+  try {
+    const payload = JSON.parse(message.toString())
+
+    // helper: always turn JSON into an array
+    const toArray = (data) => {
+      if (Array.isArray(data)) return data
+      if (data && typeof data === 'object') return Object.values(data)
+      return []
+    }
+
+    // INBOUND: Node-RED sends { "DN-2025-001": {...}, "DN-2025-002": {...} }
+    if (topic === TOPIC_INBOUND) {
+      const list = toArray(payload)
+      setInboundList(list)
+    }
+
+    // APPROVAL: if you also change it to object on Node-RED side, same logic works
+    if (topic === TOPIC_APPROVAL) {
+      const list = toArray(payload)
+      setApprovalList(list)
+    }
+
+    // HISTORY: still single object per message, keep as-is
+    if (topic === TOPIC_HISTORY) {
+      const newItem = { ...payload, supplier: "Warehouse Supplier A" }
+      setHistoryList(prev => [newItem, ...prev])
+    }
+  } catch (error) {
+    console.error(error)
+  }
+})
+
 
     return () => mqttClient.end()
   }, [])
