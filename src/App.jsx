@@ -10,7 +10,7 @@ import RateCardsPage from './pages/RateCardsPage'
 import WarehouseActivityPage from './pages/WarehouseActivityPage'
 import BillingPage from './pages/BillingPage'
 
-const BROKER_URL = 'ws://13.229.82.59:8083/mqtt'
+const BROKER_URL = 'wss://13.229.82.59:8083/mqtt'
 
 const TOPIC_INBOUND = 'Henkel/Shanghai/Logistics/Costing/State/Inbound_List'
 const TOPIC_APPROVAL = 'Henkel/Shanghai/Logistics/Costing/State/Approval_List'
