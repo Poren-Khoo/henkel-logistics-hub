@@ -24,6 +24,10 @@ export default function WarehouseGauge({ value = 0, max = 100 }) {
       <div className="absolute top-6 left-6">
         <h3 className="text-base font-bold text-slate-800">Warehouse Load</h3>
         <p className="text-xs text-slate-400 font-medium uppercase">Real-time Capacity</p>
+
+        <p className="text-[10px] text-slate-400 mt-1 italic">
+            (Based on daily activity volume)
+        </p>
       </div>
 
       {/* The Gauge */}
