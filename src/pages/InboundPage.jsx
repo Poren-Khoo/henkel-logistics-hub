@@ -33,6 +33,7 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
   
   const [formData, setFormData] = useState({
     urgent_delivery: false, repacking: false, temperature_control: false,
+    loading: false, // 👈 ADD THIS NEW LINE (Activity 4)
     special_instructions: "", completion_date: "", remarks: "" 
     // REMOVED: storage_days (As per manager request, now comes from SAP)
   })
@@ -59,6 +60,7 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
     } else {
         setFormData({
             urgent_delivery: false, repacking: false, temperature_control: false,
+            loading: false, // 👈 ADD THIS NEW LINE (Activity 4)
             special_instructions: "", completion_date: new Date().toISOString().split('T')[0], remarks: ""
             // REMOVED: storage_days reset
         })
@@ -273,6 +275,10 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
                                         <div className="flex items-center space-x-3 p-3 border rounded-md hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setFormData(prev => ({...prev, temperature_control: !prev.temperature_control}))}>
                                             <Checkbox id="temp" checked={formData.temperature_control} onCheckedChange={(c) => setFormData({...formData, temperature_control: c})} />
                                             <Label htmlFor="temp" className="cursor-pointer font-medium">Activity 3</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-3 p-3 border rounded-md hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setFormData(prev => ({...prev, loading: !prev.loading}))}>
+                                            <Checkbox id="loading" checked={formData.loading} onCheckedChange={(c) => setFormData({...formData, loading: c})} />
+                                            <Label htmlFor="loading" className="cursor-pointer font-medium">Activity 4</Label>
                                         </div>
                                     </div>
                                 </div>

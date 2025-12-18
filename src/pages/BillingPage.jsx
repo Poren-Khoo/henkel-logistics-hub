@@ -4,13 +4,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Send, FileText, Filter, Plus } from "lucide-react"
+import { Send, FileText, Filter, Plus, Trash2 } from "lucide-react"
 
-export default function BillingPage({ transactionData = [], invoices = [], onGenerate, onUpdate }) {
+export default function BillingPage({ transactionData = [], invoices = [], onGenerate, onUpdate, onDelete }) {
   // --- STATE ---
   const [selectedSupplier, setSelectedSupplier] = useState("All") 
   const [selectedYear, setSelectedYear] = useState("2025")
   const [selectedMonth, setSelectedMonth] = useState("December")
+
+  // 🧠 SMART LOGIC: Find all DNs that are already inside an invoice
+  // We look through every invoice, grab its 'items' list, and collect the DN numbers.
+  const billedDNs = new Set(
+    invoices.flatMap(inv => inv.items ? inv.items.map(i => i.dn_no) : [])
+  )
 
   // --- FILTER LOGIC ---
   const filteredTransactions = transactionData.filter(item => {
@@ -23,7 +29,10 @@ export default function BillingPage({ transactionData = [], invoices = [], onGen
       const matchMonth = monthNames[itemDate.getMonth()] === selectedMonth
       const matchSupplier = selectedSupplier === "All" || item.supplier === selectedSupplier
 
-      return matchYear && matchMonth && matchSupplier
+      // 🧠 NEW CHECK: Only show if NOT already billed
+      const isUnbilled = !billedDNs.has(item.dn_no)
+
+      return matchYear && matchMonth && matchSupplier && isUnbilled
   })
 
   const totalAmount = filteredTransactions.reduce((sum, item) => sum + (item.final_cost || 0), 0)
@@ -39,7 +48,7 @@ export default function BillingPage({ transactionData = [], invoices = [], onGen
           supplier: selectedSupplier,
           total: totalAmount,
           status: "Draft",
-          items: filteredTransactions
+          items: filteredTransactions // We save the specific items into this invoice
       }
       onGenerate(newInvoice)
   }
@@ -84,15 +93,25 @@ export default function BillingPage({ transactionData = [], invoices = [], onGen
                                       </Badge>
                                   </TableCell>
                                   <TableCell className="text-right pr-6">
-                                      {inv.status === "Draft" ? (
-                                          <Button size="sm" variant="outline" className="hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200" onClick={() => onUpdate({...inv, status: "Sent"})}>
-                                              <Send size={14} className="mr-2"/> Send
+                                      <div className="flex justify-end items-center gap-2">
+                                          {inv.status === "Draft" ? (
+                                              <Button size="sm" variant="outline" className="hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200" onClick={() => onUpdate({...inv, status: "Sent"})}>
+                                                  <Send size={14} className="mr-2"/> Send
+                                              </Button>
+                                          ) : (
+                                              <Button size="sm" variant="ghost" disabled>
+                                                  <FileText size={14} className="mr-2"/> View
+                                              </Button>
+                                          )}
+                                          <Button 
+                                              size="sm" 
+                                              variant="ghost" 
+                                              className="text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                              onClick={() => onDelete(inv.id)}
+                                          >
+                                              <Trash2 size={16} />
                                           </Button>
-                                      ) : (
-                                          <Button size="sm" variant="ghost" disabled>
-                                              <FileText size={14} className="mr-2"/> View
-                                          </Button>
-                                      )}
+                                      </div>
                                   </TableCell>
                               </TableRow>
                           ))
@@ -184,12 +203,15 @@ export default function BillingPage({ transactionData = [], invoices = [], onGen
                   </TableHeader>
                   <TableBody>
                       {filteredTransactions.length === 0 ? (
-                          <TableRow><TableCell colSpan={4} className="text-center h-32 text-slate-400">No transactions found for this period.</TableCell></TableRow>
+                          <TableRow><TableCell colSpan={4} className="text-center h-32 text-slate-400">All transactions billed.</TableCell></TableRow>
                       ) : (
                           filteredTransactions.map((t, i) => (
                               <TableRow key={i} className="hover:bg-slate-50 transition-colors">
                                   <TableCell className="pl-6 font-medium text-slate-900">{t.dn_no}</TableCell>
-                                  <TableCell className="text-slate-600">{new Date(t.approved_at).toLocaleDateString()}</TableCell>
+                                  {/* 🟢 DATE FIX IS HERE TOO */}
+                                  <TableCell className="text-slate-600">
+                                    {t.approved_at ? new Date(t.approved_at).toLocaleDateString() : new Date().toLocaleDateString()}
+                                  </TableCell>
                                   <TableCell className="text-slate-600">{t.supplier}</TableCell>
                                   <TableCell className="text-right font-bold text-slate-900 pr-6">¥{t.final_cost?.toFixed(2)}</TableCell>
                               </TableRow>
@@ -198,6 +220,7 @@ export default function BillingPage({ transactionData = [], invoices = [], onGen
                   </TableBody>
               </Table>
           </Card>
+
       </div>
     </div>
   )

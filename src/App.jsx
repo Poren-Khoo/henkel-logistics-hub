@@ -84,10 +84,40 @@ function App() {
         }
 
         if (topic === TOPIC_INBOUND) setInboundList(toArray(payload))
-        if (topic === TOPIC_APPROVAL) setApprovalList(toArray(payload))
-        if (topic === TOPIC_HISTORY) setHistoryList(toArray(payload))
+        
+        if (topic === TOPIC_APPROVAL) {
+          // If backend sends { approval_queue: [...] }, unwrap it. 
+          // If it sends [...], use it directly.
+          const listData = payload.approval_queue ? payload.approval_queue : payload;
+          setApprovalList(toArray(listData));
+        }
+        
+        if (topic === TOPIC_HISTORY) {
+          // 🧠 LOGIC FIX: Handle both "New Item" and "Nuke/Reset" signals
+          
+          // Case 1: The "Nuke" Signal (Empty Array) -> Clear the list
+          if (Array.isArray(payload) && payload.length === 0) {
+              setHistoryList([]); 
+              return;
+          }
+
+          // Case 2: A Real Transaction (Object) -> Add to list
+          if (payload && payload.dn_no) {
+              const newItem = payload;
+              setHistoryList(prevList => {
+                 // Prevent duplicates
+                 if (prevList.some(item => item.dn_no === newItem.dn_no)) return prevList;
+                 return [newItem, ...prevList];
+              })
+          }
+        }
         if (topic === TOPIC_RATES) setRateList(toArray(payload))
-        if (topic === TOPIC_INVOICES) setInvoiceList(toArray(payload))
+        
+        if (topic === TOPIC_INVOICES) {
+          // Unwrap the object to get the array for the UI
+          const list = payload.invoice_list ? payload.invoice_list : payload;
+          setInvoiceList(toArray(list))
+        }
         
         // 👇 CLEANING GHOSTS ON THE FRONTEND TOO (Safety Net)
         if (topic === TOPIC_ACTIVITIES) {
@@ -200,7 +230,7 @@ function App() {
     const updatedList = [newInvoice, ...invoiceList]
     setInvoiceList(updatedList)
     if (client) {
-        client.publish(TOPIC_INVOICES, JSON.stringify(updatedList), { retain: true })
+        client.publish(TOPIC_INVOICES, JSON.stringify({ invoice_list: updatedList }), { retain: true })
     }
   }
 
@@ -208,7 +238,16 @@ function App() {
     const updatedList = invoiceList.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv)
     setInvoiceList(updatedList)
     if (client) {
-        client.publish(TOPIC_INVOICES, JSON.stringify(updatedList), { retain: true })
+        client.publish(TOPIC_INVOICES, JSON.stringify({ invoice_list: updatedList }), { retain: true })
+    }
+  }
+
+  const handleDeleteInvoice = (idToDelete) => {
+    const updatedList = invoiceList.filter(inv => inv.id !== idToDelete)
+    setInvoiceList(updatedList)
+    if (client) {
+        // This publishes the CLEAN list to the cloud, fixing your UNS!
+        client.publish(TOPIC_INVOICES, JSON.stringify({ invoice_list: updatedList }), { retain: true })
     }
   }
 
@@ -237,7 +276,7 @@ function App() {
           <Route path="approvals" element={<ApprovalPage data={approvalList} onAudit={handleAudit} />} />
           <Route path="history" element={<HistoryPage data={historyList} />} />
           
-          <Route path="billing" element={<BillingPage transactionData={historyList} invoices={invoiceList} onGenerate={handleAddInvoice} onUpdate={handleUpdateInvoice} />} />
+          <Route path="billing" element={<BillingPage transactionData={historyList} invoices={invoiceList} onGenerate={handleAddInvoice} onUpdate={handleUpdateInvoice} onDelete={handleDeleteInvoice} />} />
           
           <Route path="rates" element=
           {<RateCardsPage

@@ -1,0 +1,1120 @@
+[
+    {
+        "id": "63208fafb5b39586",
+        "type": "tab",
+        "label": "Logistics_Management",
+        "disabled": false,
+        "info": "Henkel Logistics Management Demo"
+    },
+    {
+        "id": "cbb162fa7d339757",
+        "type": "group",
+        "z": "63208fafb5b39586",
+        "name": "SAP Inbound",
+        "style": {
+            "label": true
+        },
+        "nodes": [
+            "479cc12df138087c",
+            "db06e1a0d397f996",
+            "924f0e7414f7725f",
+            "f7a6386f5f3640eb",
+            "0c54f66354f373d0",
+            "b3b4e9c63a213e3d",
+            "a9b6e4e3d844cf55",
+            "cca8cab56f311432",
+            "d73e38546befd7d1",
+            "3ec09d71681f7ef6"
+        ],
+        "x": 154,
+        "y": 159,
+        "w": 952,
+        "h": 302
+    },
+    {
+        "id": "d81fbc285c150c4f",
+        "type": "group",
+        "z": "63208fafb5b39586",
+        "name": "Pricing Engine",
+        "style": {
+            "label": true
+        },
+        "nodes": [
+            "9405a18d8bcc2bd6",
+            "045adc34be4dbe1b",
+            "6d215dc8477611b0",
+            "75bc93318a50e51f",
+            "571243bac888e302",
+            "06323e819083b22a",
+            "5c5204d94cd74b26",
+            "7c45b9b48d2b344b",
+            "b73c54fbe333b87d"
+        ],
+        "x": 154,
+        "y": 499,
+        "w": 952,
+        "h": 302
+    },
+    {
+        "id": "90090000142fb20d",
+        "type": "group",
+        "z": "63208fafb5b39586",
+        "name": "Audit",
+        "style": {
+            "label": true
+        },
+        "nodes": [
+            "350993106346b2c8",
+            "a5134c6437cdf4e7",
+            "7607202bc4810fa0",
+            "aff095cc60395a03",
+            "d8e906241ae5ef0c",
+            "d2b49e562778ac95",
+            "8e191ddebbfc9ca6",
+            "cfb5c2bcd97a01f1"
+        ],
+        "x": 74,
+        "y": 839,
+        "w": 1032,
+        "h": 242
+    },
+    {
+        "id": "group_activity_log",
+        "type": "group",
+        "z": "63208fafb5b39586",
+        "name": "Activity Logger",
+        "style": {
+            "label": true
+        },
+        "nodes": [
+            "node_log_in",
+            "node_log_func",
+            "node_log_out"
+        ],
+        "x": 1174,
+        "y": 419,
+        "w": 602,
+        "h": 82
+    },
+    {
+        "id": "2fb75d6fb807fc6e",
+        "type": "group",
+        "z": "63208fafb5b39586",
+        "name": "Listen to Rates",
+        "style": {
+            "label": true
+        },
+        "nodes": [
+            "rate_card_in",
+            "rate_card_store",
+            "debug_rates"
+        ],
+        "x": 1154,
+        "y": 299,
+        "w": 692,
+        "h": 82
+    },
+    {
+        "id": "26910bec36775af0",
+        "type": "group",
+        "z": "63208fafb5b39586",
+        "name": "Nuke",
+        "style": {
+            "label": true
+        },
+        "nodes": [
+            "nuke_button",
+            "nuke_function",
+            "nuke_mqtt_out"
+        ],
+        "x": 1154,
+        "y": 179,
+        "w": 732,
+        "h": 82
+    },
+    {
+        "id": "9405a18d8bcc2bd6",
+        "type": "mqtt in",
+        "z": "63208fafb5b39586",
+        "g": "d81fbc285c150c4f",
+        "name": "Listen for Operator",
+        "topic": "Henkel/Shanghai/Logistics/Costing/Action/Submit_Req",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "85bb67b2dbefe3ba",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 270,
+        "y": 560,
+        "wires": [
+            [
+                "045adc34be4dbe1b"
+            ]
+        ]
+    },
+    {
+        "id": "045adc34be4dbe1b",
+        "type": "function",
+        "z": "63208fafb5b39586",
+        "g": "d81fbc285c150c4f",
+        "name": "Calculate Price",
+        "func": "var req = msg.payload;\n\n// --- 1. GET DATA FROM MEMORY ---\nvar rateList = global.get(\"rate_card_memory\") || [];\nvar inboundData = global.get(\"inbound_memory\") || {};\n\n// We need the Master Qty of the DN. \nvar dnInfo = inboundData[req.dn_no] || {};\nvar masterQty = Number(dnInfo.qty) || Number(req.qty) || 0;\n\n// --- 2. HELPER: FIND RATE BY ACTIVITY NAME ---\nfunction getRate(name) {\n    var item = rateList.find(r => r.activity === name);\n    return item ? Number(item.price) : 0;\n}\n\n// --- 3. CALCULATE \"HENKEL BASIC COST\" (The 1-2-3 Rule) ---\n// Rule 1: Inbound (Per Pallet)\nvar costInbound = getRate(\"Inbound Handling\") * masterQty;\n\n// Rule 2: Outbound (Per Pallet - equals DN Qty)\nvar costOutbound = getRate(\"Outbound Handling\") * masterQty;\n\n// Rule 3: Storage (Per Pallet Per Day)\n// 🛑 FIX: We now read 'storage_days' from the SAP Data (dnInfo)\nvar days = Number(dnInfo.storage_days) || 0;\nvar costStorage = getRate(\"Storage\") * masterQty * days;\n\nvar totalBasic = costInbound + costOutbound + costStorage;\n\n\n// --- 4. CALCULATE VAS COST ---\nvar totalVas = 0;\n\nrateList.forEach(rate => {\n    if (rate.category === \"VAS\") {\n\n        var manualQty = Number(req.requirements.qty);\n        var multiplier = 1;\n\n        if (manualQty > 0) {\n            multiplier = manualQty;\n        } else {\n            var isVariable = rate.unit.includes(\"qty\") || rate.unit.includes(\"box\") || rate.unit.includes(\"pcs\") || rate.unit.includes(\"pallet\");\n            multiplier = isVariable ? masterQty : 1;\n        }\n\n        // CHECK 2: The \"Manager's Map\"\n        // MAPPING: Activity 1 <--> Urgent Delivery Checkbox\n        if (rate.activity === \"Activity 1\" && req.requirements.urgent_delivery) {\n            totalVas += Number(rate.price);\n        }\n\n        // MAPPING: Activity 2 <--> Repacking Checkbox\n        if (rate.activity === \"Activity 2\" && req.requirements.repacking) {\n            totalVas += Number(rate.price) * multiplier;\n        }\n\n        // MAPPING: Activity 3 <--> Temp Control Checkbox\n        if (rate.activity === \"Activity 3\" && req.requirements.temperature_control) {\n            totalVas += Number(rate.price) * multiplier;\n        }\n\n        // ... (Activity 3 block is above this) ...\n\n        // MAPPING: Activity 3 <--> Temp Control Checkbox\n        if (rate.activity === \"Activity 3\" && req.requirements.temperature_control) {\n            totalVas += Number(rate.price) * multiplier;\n        }\n\n        // MAPPING: Activity 4 <--> Loading Checkbox\n        if (rate.activity === \"Activity 4\" && req.requirements.loading) {\n            totalVas += Number(rate.price) * multiplier;\n        }\n\n\n        // Fallback for direct matches\n        if (req.requirements[rate.activity]) {\n            totalVas += Number(rate.price) * multiplier;\n        }\n    }\n});\n\nvar totalCost = totalBasic + totalVas;\n\n// --- 5. UPDATE MANAGER & OPERATOR LISTS ---\n\n// Manager List (Approvals)\nvar managerList = global.get(\"approval_memory\") || [];\nvar newItem = {\n    dn_no: req.dn_no,\n    basic_cost: totalBasic, // Now includes In + Out + Storage\n    vas_cost: totalVas,\n    total_cost: totalCost,\n    status: \"WAIT_APPROVAL\",\n    requirements: req.requirements,\n    supplier: req.supplier || dnInfo.supplier || \"Unknown\"\n};\n\n// Update or Push\nvar existsIndex = managerList.findIndex(item => item.dn_no === newItem.dn_no);\nif (existsIndex > -1) {\n    managerList[existsIndex] = newItem;\n} else {\n    managerList.push(newItem);\n}\nglobal.set(\"approval_memory\", managerList);\n\n// Operator List (Update Status)\nif (inboundData[req.dn_no]) {\n    inboundData[req.dn_no] = {\n        ...inboundData[req.dn_no],\n        status: \"LE COMPLETED\",\n        saved_requirements: req.requirements\n    };\n}\nglobal.set(\"inbound_memory\", inboundData);\n\n// Output\nvar wrappedManagerList = { \"approval_queue\": managerList };\n\nreturn [{ payload: wrappedManagerList }, { payload: inboundData }];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 540,
+        "y": 560,
+        "wires": [
+            [
+                "6d215dc8477611b0"
+            ],
+            [
+                "5c5204d94cd74b26"
+            ]
+        ]
+    },
+    {
+        "id": "6d215dc8477611b0",
+        "type": "mqtt out",
+        "z": "63208fafb5b39586",
+        "g": "d81fbc285c150c4f",
+        "name": "Publish to Manager",
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Approval_List",
+        "qos": "",
+        "retain": "true",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "85bb67b2dbefe3ba",
+        "x": 770,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "75bc93318a50e51f",
+        "type": "inject",
+        "z": "63208fafb5b39586",
+        "g": "d81fbc285c150c4f",
+        "name": "Test Operator",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{   \"dn_no\": \"DN88001\",   \"is_urgent\": true,   \"need_repack\": false }",
+        "payloadType": "json",
+        "x": 330,
+        "y": 620,
+        "wires": [
+            [
+                "045adc34be4dbe1b"
+            ]
+        ]
+    },
+    {
+        "id": "571243bac888e302",
+        "type": "debug",
+        "z": "63208fafb5b39586",
+        "g": "d81fbc285c150c4f",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 680,
+        "y": 700,
+        "wires": []
+    },
+    {
+        "id": "06323e819083b22a",
+        "type": "mqtt in",
+        "z": "63208fafb5b39586",
+        "g": "d81fbc285c150c4f",
+        "name": "Testing",
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Approval_List",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "85bb67b2dbefe3ba",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 350,
+        "y": 700,
+        "wires": [
+            [
+                "571243bac888e302"
+            ]
+        ]
+    },
+    {
+        "id": "479cc12df138087c",
+        "type": "mqtt out",
+        "z": "63208fafb5b39586",
+        "g": "cbb162fa7d339757",
+        "name": "",
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Inbound_List",
+        "qos": "",
+        "retain": "true",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "ac8002feb58fa588",
+        "x": 880,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "db06e1a0d397f996",
+        "type": "debug",
+        "z": "63208fafb5b39586",
+        "g": "cbb162fa7d339757",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 700,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "924f0e7414f7725f",
+        "type": "mqtt in",
+        "z": "63208fafb5b39586",
+        "g": "cbb162fa7d339757",
+        "name": "",
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Inbound_List",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "85bb67b2dbefe3ba",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 380,
+        "y": 420,
+        "wires": [
+            [
+                "db06e1a0d397f996"
+            ]
+        ]
+    },
+    {
+        "id": "f7a6386f5f3640eb",
+        "type": "function",
+        "z": "63208fafb5b39586",
+        "g": "cbb162fa7d339757",
+        "name": "Formatter",
+        "func": "// 1. 从 GLOBAL 里拿对象（而不是数组）\nvar currentMap = global.get(\"inbound_memory\") || {};\n\n// 2. Reset：如果收到 payload = []\nif (Array.isArray(msg.payload) && msg.payload.length === 0) {\n    currentMap = {};\n    global.set(\"inbound_memory\", currentMap);\n    msg.payload = currentMap;  // 输出也是一个空对象 {}\n    return msg;\n}\n\n// 3. 根据 payload 类型写入\n\n// 3.1 如果是数组：批量导入\nif (Array.isArray(msg.payload)) {\n    msg.payload.forEach(function (item) {\n        if (item && item.dn_no) {\n            currentMap[item.dn_no] = item;  // 用 dn_no 当 key\n        }\n    });\n}\n// 3.2 如果是单个对象：写入一条\nelse if (msg.payload && typeof msg.payload === \"object\") {\n    if (msg.payload.dn_no) {\n        currentMap[msg.payload.dn_no] = msg.payload;\n    }\n}\n\n// 4. 保存回 GLOBAL，并输出为 OBJECT\nglobal.set(\"inbound_memory\", currentMap);\nmsg.payload = currentMap;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 580,
+        "y": 320,
+        "wires": [
+            [
+                "479cc12df138087c",
+                "849d11b896df09dc"
+            ]
+        ]
+    },
+    {
+        "id": "5c5204d94cd74b26",
+        "type": "mqtt out",
+        "z": "63208fafb5b39586",
+        "g": "d81fbc285c150c4f",
+        "name": "",
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Inbound_List",
+        "qos": "",
+        "retain": "true",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "85bb67b2dbefe3ba",
+        "x": 880,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "b73c54fbe333b87d",
+        "type": "inject",
+        "z": "63208fafb5b39586",
+        "g": "d81fbc285c150c4f",
+        "name": "Test Submit",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{     \"dn_no\": \"DN-88001\",     \"operator\": \"Gemini_Tester\",     \"requirements\": {         \"urgent\": true,         \"repack\": false     },     \"destination\": \"Beijing\" }",
+        "payloadType": "json",
+        "x": 370,
+        "y": 760,
+        "wires": [
+            [
+                "7c45b9b48d2b344b"
+            ]
+        ]
+    },
+    {
+        "id": "7c45b9b48d2b344b",
+        "type": "mqtt out",
+        "z": "63208fafb5b39586",
+        "g": "d81fbc285c150c4f",
+        "name": "",
+        "topic": "Henkel/Shanghai/Logistics/Costing/Action/Submit_Req",
+        "qos": "",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "85bb67b2dbefe3ba",
+        "x": 680,
+        "y": 760,
+        "wires": []
+    },
+    {
+        "id": "350993106346b2c8",
+        "type": "mqtt in",
+        "z": "63208fafb5b39586",
+        "g": "90090000142fb20d",
+        "name": "",
+        "topic": "Henkel/Shanghai/Logistics/Costing/Action/Audit_Result",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "85bb67b2dbefe3ba",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 300,
+        "y": 920,
+        "wires": [
+            [
+                "cfb5c2bcd97a01f1"
+            ]
+        ]
+    },
+    {
+        "id": "a5134c6437cdf4e7",
+        "type": "function",
+        "z": "63208fafb5b39586",
+        "g": "90090000142fb20d",
+        "name": "Audit Logic",
+        "func": "var decision = msg.payload;\n\n// --- 1. Metric: Send SINGLE Object (For UNS Compliance) ---\n// 目标：符合 UNS Metric 格式，只发送最新的一条单据\nvar msg_metric = null;\n\nif (decision.action === \"APPROVE\") {\n\n    // 获取内存中的列表（仅用于计算，不直接发给 UNS Metric）\n    var managerList = global.get(\"approval_memory\") || [];\n    var itemInMemory = managerList.find(i => i.dn_no === decision.dn_no);\n    var supplierName = itemInMemory ? itemInMemory.supplier : \"Unknown Supplier\";\n\n    // 创建单条记录对象 (Single Layer Key-Value)\n    var singleMetric = {\n        \"dn_no\": decision.dn_no,\n        \"final_cost\": Number(decision.total),\n        \"supplier\": supplierName,\n        \"approved_at\": new Date().toISOString()\n    };\n\n    // 这一步是为了让 Node-RED 的 debug 也能看到历史（可选）\n    // var historyList = global.get(\"history_memory\") || [];\n    // historyList.unshift(singleMetric);\n    // global.set(\"history_memory\", historyList);\n\n    // 输出单条数据给 UNS\n    msg_metric = {\n        payload: singleMetric\n    };\n}\n\n// --- 2. State: Update Manager's List (Array -> Object Map or List) ---\n// 注意：如果 Approval_List 也是 State 且不能是 Array，\n// 你可能需要在前端处理，或者这里也转成 Object Map。\n// 目前为了不改动太大，我们先只修 Metric。\nvar managerList = global.get(\"approval_memory\") || [];\nvar updatedManagerList = managerList.filter(item => item.dn_no !== decision.dn_no);\nglobal.set(\"approval_memory\", updatedManagerList);\n\nvar msg_update_approval = {\n    payload: updatedManagerList\n};\n\n// --- 3. Rejection Logic ---\nvar msg_reject = null;\n// (省略 rejection 逻辑，保持原样)\n\n// 输出顺序要对应连线： [Metric, Approval_List, Inbound_List]\nreturn [msg_metric, msg_update_approval, msg_reject];",
+        "outputs": 3,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 750,
+        "y": 920,
+        "wires": [
+            [
+                "7607202bc4810fa0"
+            ],
+            [
+                "d8e906241ae5ef0c"
+            ],
+            [
+                "aff095cc60395a03"
+            ]
+        ]
+    },
+    {
+        "id": "7607202bc4810fa0",
+        "type": "mqtt out",
+        "z": "63208fafb5b39586",
+        "g": "90090000142fb20d",
+        "name": "The Archive",
+        "topic": "Henkel/Shanghai/Logistics/Costing/Metric/Final_Cost",
+        "qos": "",
+        "retain": "true",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "85bb67b2dbefe3ba",
+        "x": 950,
+        "y": 880,
+        "wires": []
+    },
+    {
+        "id": "aff095cc60395a03",
+        "type": "mqtt out",
+        "z": "63208fafb5b39586",
+        "g": "90090000142fb20d",
+        "name": "Send Back to Operator",
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Inbound_List",
+        "qos": "",
+        "retain": "true",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "85bb67b2dbefe3ba",
+        "x": 980,
+        "y": 960,
+        "wires": []
+    },
+    {
+        "id": "d8e906241ae5ef0c",
+        "type": "mqtt out",
+        "z": "63208fafb5b39586",
+        "g": "90090000142fb20d",
+        "name": "Clear Manager's Desk",
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Approval_List",
+        "qos": "",
+        "retain": "true",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "85bb67b2dbefe3ba",
+        "x": 980,
+        "y": 920,
+        "wires": []
+    },
+    {
+        "id": "d2b49e562778ac95",
+        "type": "inject",
+        "z": "63208fafb5b39586",
+        "g": "90090000142fb20d",
+        "name": "Test Button",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"dn_no\":\"DN-88001\",\"action\":\"APPROVE\",\"total\":300}",
+        "payloadType": "json",
+        "x": 320,
+        "y": 1040,
+        "wires": [
+            [
+                "8e191ddebbfc9ca6"
+            ]
+        ]
+    },
+    {
+        "id": "8e191ddebbfc9ca6",
+        "type": "mqtt out",
+        "z": "63208fafb5b39586",
+        "g": "90090000142fb20d",
+        "name": "",
+        "topic": "Henkel/Shanghai/Logistics/Costing/Action/Audit_Result",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "85bb67b2dbefe3ba",
+        "x": 620,
+        "y": 1040,
+        "wires": []
+    },
+    {
+        "id": "cfb5c2bcd97a01f1",
+        "type": "json",
+        "z": "63208fafb5b39586",
+        "g": "90090000142fb20d",
+        "name": "",
+        "property": "payload",
+        "action": "obj",
+        "pretty": false,
+        "x": 590,
+        "y": 920,
+        "wires": [
+            [
+                "a5134c6437cdf4e7"
+            ]
+        ]
+    },
+    {
+        "id": "3ec09d71681f7ef6",
+        "type": "inject",
+        "z": "63208fafb5b39586",
+        "g": "cbb162fa7d339757",
+        "name": "Reset/ Clear",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "[]",
+        "payloadType": "json",
+        "x": 510,
+        "y": 200,
+        "wires": [
+            [
+                "f7a6386f5f3640eb"
+            ]
+        ]
+    },
+    {
+        "id": "0c54f66354f373d0",
+        "type": "inject",
+        "z": "63208fafb5b39586",
+        "g": "cbb162fa7d339757",
+        "name": "Simulate SAP",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Inbound_List",
+        "payload": "{\"dn_no\":\"DN-2025-001\",\"material\":\"Loctite-Super-Glue\",\"qty\":10,\"destination\":\"Shanghai\",\"status\":\"NEW\",\"supplier\":\"Warehouse Supplier A\",\"storage_days\":5}",
+        "payloadType": "json",
+        "x": 310,
+        "y": 380,
+        "wires": [
+            [
+                "f7a6386f5f3640eb"
+            ]
+        ]
+    },
+    {
+        "id": "849d11b896df09dc",
+        "type": "debug",
+        "z": "63208fafb5b39586",
+        "name": "debug 3",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 740,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "rate_card_in",
+        "type": "mqtt in",
+        "z": "63208fafb5b39586",
+        "g": "2fb75d6fb807fc6e",
+        "name": "Listen for New Rates",
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Rate_Card",
+        "qos": "2",
+        "datatype": "json",
+        "broker": "85bb67b2dbefe3ba",
+        "nl": false,
+        "rap": true,
+        "inputs": 0,
+        "x": 1270,
+        "y": 340,
+        "wires": [
+            [
+                "rate_card_store"
+            ]
+        ]
+    },
+    {
+        "id": "rate_card_store",
+        "type": "function",
+        "z": "63208fafb5b39586",
+        "g": "2fb75d6fb807fc6e",
+        "name": "Update Global Rates",
+        "func": "// Save the new Rate List to global memory\n// Payload is an Array of Objects: [{activity: 'Urgent', vas_cost: 500}, ...]\nglobal.set(\"rate_card_memory\", msg.payload);\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1520,
+        "y": 340,
+        "wires": [
+            [
+                "debug_rates"
+            ]
+        ]
+    },
+    {
+        "id": "debug_rates",
+        "type": "debug",
+        "z": "63208fafb5b39586",
+        "g": "2fb75d6fb807fc6e",
+        "name": "Rates Updated",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1720,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "node_log_in",
+        "type": "mqtt in",
+        "z": "63208fafb5b39586",
+        "g": "group_activity_log",
+        "name": "Listen for Activity",
+        "topic": "Henkel/Shanghai/Logistics/Costing/Action/Submit_Req",
+        "qos": "2",
+        "datatype": "json",
+        "broker": "85bb67b2dbefe3ba",
+        "nl": false,
+        "rap": true,
+        "inputs": 0,
+        "x": 1280,
+        "y": 460,
+        "wires": [
+            [
+                "node_log_func"
+            ]
+        ]
+    },
+    {
+        "id": "node_log_func",
+        "type": "function",
+        "z": "63208fafb5b39586",
+        "g": "group_activity_log",
+        "name": "Save to Logbook",
+        "func": "var req = msg.payload;\n\n// 🛑 THE FIX: FILTER GHOST ENTRIES\n// If the message does NOT have 'manual_activity_name', it means it came \n// from the Inbound Page (Submit Order), not the Activity Page.\n// We return null to STOP the flow immediately.\nif (!req.requirements || !req.requirements.manual_activity_name) {\n    return null; \n}\n\n// 1. Get existing logs\nvar activityLog = global.get(\"activity_memory\") || [];\n\n// 2. Create the \"Receipt\"\nvar newEntry = {\n    id: Date.now(),\n    // Use ISO string for better sorting, or keep local if you prefer\n    timestamp: new Date().toISOString(), \n    dn_no: req.dn_no,\n    activity: req.requirements.manual_activity_name, // We know this exists now\n    qty: req.requirements.qty || 1,\n    unit: \"unit\",\n    operator: req.operator || \"Unknown\",\n    status: \"Recorded\"\n};\n\n// 3. Add to top of list\nactivityLog.unshift(newEntry);\n\n// 4. Save and Send\nglobal.set(\"activity_memory\", activityLog);\nmsg.payload = activityLog;\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1490,
+        "y": 460,
+        "wires": [
+            [
+                "node_log_out"
+            ]
+        ]
+    },
+    {
+        "id": "node_log_out",
+        "type": "mqtt out",
+        "z": "63208fafb5b39586",
+        "g": "group_activity_log",
+        "name": "Publish Log",
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Activity_Log",
+        "qos": "",
+        "retain": "true",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "85bb67b2dbefe3ba",
+        "x": 1680,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "b3b4e9c63a213e3d",
+        "type": "inject",
+        "z": "63208fafb5b39586",
+        "g": "cbb162fa7d339757",
+        "name": "Simulate SAP",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Inbound_List",
+        "payload": "{\"dn_no\":\"DN-2025-002\",\"material\":\"Henkel-Industrial-Adhesive\",\"qty\":200,\"destination\":\"Beijing\",\"status\":\"NEW\",\"supplier\":\"Warehouse Supplier A\",\"storage_days\":20}",
+        "payloadType": "json",
+        "x": 310,
+        "y": 340,
+        "wires": [
+            [
+                "f7a6386f5f3640eb"
+            ]
+        ]
+    },
+    {
+        "id": "a9b6e4e3d844cf55",
+        "type": "inject",
+        "z": "63208fafb5b39586",
+        "g": "cbb162fa7d339757",
+        "name": "Simulate SAP",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Inbound_List",
+        "payload": "{\"dn_no\":\"DN-2025-003\",\"material\":\"Loctite-Threadlocker-243\",\"qty\":50,\"destination\":\"Shanghai\",\"status\":\"NEW\",\"supplier\":\"Warehouse Supplier B\",\"storage_days\":10}",
+        "payloadType": "json",
+        "x": 310,
+        "y": 300,
+        "wires": [
+            [
+                "f7a6386f5f3640eb"
+            ]
+        ]
+    },
+    {
+        "id": "cca8cab56f311432",
+        "type": "inject",
+        "z": "63208fafb5b39586",
+        "g": "cbb162fa7d339757",
+        "name": "Simulate SAP",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Inbound_List",
+        "payload": "{\"dn_no\":\"DN-2025-004\",\"material\":\"Henkel-Sealant-RTV\",\"qty\":10,\"destination\":\"Beijing\",\"status\":\"NEW\",\"supplier\":\"Warehouse Supplier A\",\"storage_days\":25}",
+        "payloadType": "json",
+        "x": 310,
+        "y": 260,
+        "wires": [
+            [
+                "f7a6386f5f3640eb"
+            ]
+        ]
+    },
+    {
+        "id": "d73e38546befd7d1",
+        "type": "inject",
+        "z": "63208fafb5b39586",
+        "g": "cbb162fa7d339757",
+        "name": "Simulate SAP",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Inbound_List",
+        "payload": "{\"dn_no\":\"DN-2025-005\",\"material\":\"Loctite-Super-Glue\",\"qty\":50,\"destination\":\"Shanghai\",\"status\":\"NEW\",\"supplier\":\"Warehouse Supplier B\",\"storage_days\":30}",
+        "payloadType": "json",
+        "x": 310,
+        "y": 220,
+        "wires": [
+            [
+                "f7a6386f5f3640eb"
+            ]
+        ]
+    },
+    {
+        "id": "nuke_button",
+        "type": "inject",
+        "z": "63208fafb5b39586",
+        "g": "26910bec36775af0",
+        "name": "☢️ NUKE ALL DATA",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 1290,
+        "y": 220,
+        "wires": [
+            [
+                "nuke_function"
+            ]
+        ]
+    },
+    {
+        "id": "nuke_function",
+        "type": "function",
+        "z": "63208fafb5b39586",
+        "g": "26910bec36775af0",
+        "name": "Clear & Publish Empty",
+        "func": "// 1. Wipe the Backend Memory\nglobal.set(\"inbound_memory\", {});\nglobal.set(\"approval_memory\", []);\nglobal.set(\"history_memory\", []);\nglobal.set(\"activity_memory\", []);\n\n// 2. Prepare Empty Messages for Frontend\n// We must set 'retain: true' to overwrite the old data in the cloud\nvar msg1 = { topic: \"Henkel/Shanghai/Logistics/Costing/State/Inbound_List\", payload: {}, retain: true };\nvar msg2 = { topic: \"Henkel/Shanghai/Logistics/Costing/State/Approval_List\", payload: [], retain: true };\nvar msg3 = { topic: \"Henkel/Shanghai/Logistics/Costing/Metric/Final_Cost\", payload: [], retain: true };\nvar msg4 = { topic: \"Henkel/Shanghai/Logistics/Costing/State/Activity_Log\", payload: [], retain: true };\nvar msg5 = { topic: \"Henkel/Shanghai/Logistics/Costing/State/Invoices\", payload: [], retain: true };\n// 3. Send all 4 messages at once\nreturn [[msg1, msg2, msg3, msg4, msg5]];",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1540,
+        "y": 220,
+        "wires": [
+            [
+                "nuke_mqtt_out"
+            ]
+        ]
+    },
+    {
+        "id": "nuke_mqtt_out",
+        "type": "mqtt out",
+        "z": "63208fafb5b39586",
+        "g": "26910bec36775af0",
+        "name": "Broadcaster",
+        "topic": "",
+        "qos": "",
+        "retain": "true",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "85bb67b2dbefe3ba",
+        "x": 1790,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "force_invoice_inject",
+        "type": "inject",
+        "z": "63208fafb5b39586",
+        "name": "FORCE INVOICES",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 1270,
+        "y": 640,
+        "wires": [
+            [
+                "force_invoice_func"
+            ]
+        ]
+    },
+    {
+        "id": "force_invoice_func",
+        "type": "function",
+        "z": "63208fafb5b39586",
+        "name": "Create Dummy Invoice",
+        "func": "// Manually create the invoice list\nvar invoices = [\n    {\n        \"id\": 1734540000000,\n        \"period\": \"December 2025\",\n        \"supplier\": \"Warehouse Supplier A\",\n        \"total\": 3800,\n        \"status\": \"Draft\"\n    }\n];\n\n// 🛑 THE FIX: Wrap the Array in an Object\n// UNS requires: { \"key\": [array] }\nmsg.payload = { \"invoice_list\": invoices };\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1500,
+        "y": 640,
+        "wires": [
+            [
+                "force_invoice_out",
+                "5a6a22c8bcd792bd"
+            ]
+        ]
+    },
+    {
+        "id": "force_invoice_out",
+        "type": "mqtt out",
+        "z": "63208fafb5b39586",
+        "name": "Publish to Invoices",
+        "topic": "Henkel/Shanghai/Logistics/Costing/State/Invoices",
+        "qos": "0",
+        "retain": "true",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "85bb67b2dbefe3ba",
+        "x": 1750,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "5a6a22c8bcd792bd",
+        "type": "debug",
+        "z": "63208fafb5b39586",
+        "name": "debug 4",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1800,
+        "y": 700,
+        "wires": []
+    },
+    {
+        "id": "85bb67b2dbefe3ba",
+        "type": "mqtt-broker",
+        "name": "emqx:1883",
+        "broker": "emqx",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "ac8002feb58fa588",
+        "type": "mqtt-broker",
+        "name": "localhost",
+        "broker": "emqx",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    }
+]
