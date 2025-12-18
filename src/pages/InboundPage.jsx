@@ -33,7 +33,8 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
   
   const [formData, setFormData] = useState({
     urgent_delivery: false, repacking: false, temperature_control: false,
-    special_instructions: "", completion_date: "", remarks: "", storage_days: 0           
+    special_instructions: "", completion_date: "", remarks: "" 
+    // REMOVED: storage_days (As per manager request, now comes from SAP)
   })
 
   // --- FILTER LOGIC ---
@@ -58,7 +59,8 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
     } else {
         setFormData({
             urgent_delivery: false, repacking: false, temperature_control: false,
-            special_instructions: "", completion_date: new Date().toISOString().split('T')[0], remarks: "", storage_days: 0
+            special_instructions: "", completion_date: new Date().toISOString().split('T')[0], remarks: ""
+            // REMOVED: storage_days reset
         })
         setIsViewOnly(false)
     }
@@ -165,8 +167,8 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
                     </TableCell>
                     
                     <TableCell className="text-right">
-                       {/* CLEAN ACTION BUTTONS */}
-                       {item.status === 'NEW' ? (
+                        {/* CLEAN ACTION BUTTONS */}
+                        {item.status === 'NEW' ? (
                           <Button 
                             size="sm" 
                             className="h-8 bg-[#e60000] text-white hover:bg-red-700 shadow-sm font-medium"
@@ -174,7 +176,7 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
                           >
                             <Pencil className="mr-2 h-3 w-3" /> Process
                           </Button>
-                       ) : (
+                        ) : (
                           <Button 
                             variant="ghost" 
                             size="sm" 
@@ -184,7 +186,7 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
                             <span className="sr-only">Open menu</span>
                             <Eye className="h-4 w-4 text-slate-500" />
                           </Button>
-                       )}
+                        )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -193,7 +195,7 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
         </Table>
       </div>
 
-      {/* --- DIALOG / POPUP (KEPT MOSTLY SAME, JUST CLEANED) --- */}
+      {/* --- DIALOG / POPUP --- */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-5xl p-0 overflow-hidden h-[80vh] flex flex-col gap-0">
           
@@ -225,7 +227,7 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
                 <div className="flex-1 overflow-y-auto p-6">
                     {/* TAB 1: REQUIREMENTS */}
                     <TabsContent value="requirements" className="mt-0 h-full">
-                         <div className="grid grid-cols-12 gap-6 h-full">
+                          <div className="grid grid-cols-12 gap-6 h-full">
                             {/* Left Column: Material Info */}
                             <div className="col-span-5 space-y-4">
                                 <div className="p-4 border rounded-lg bg-slate-50/50 space-y-3">
@@ -275,23 +277,11 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
                                     </div>
                                 </div>
 
-                                <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-lg space-y-4">
-                                    <div className="flex justify-between items-center">
-                                        <Label className="text-blue-900 font-semibold">Storage Simulation</Label>
-                                        <Badge variant="secondary" className="bg-white text-blue-700 border border-blue-200">
-                                            {formData.storage_days || 0} Days
-                                        </Badge>
-                                    </div>
-                                    <Input 
-                                        type="range" min="0" max="30" step="1"
-                                        className="cursor-pointer accent-blue-600"
-                                        value={formData.storage_days || 0}
-                                        onChange={(e) => setFormData({...formData, storage_days: parseInt(e.target.value)})}
-                                    />
-                                    <p className="text-[11px] text-blue-500/80 font-medium">
-                                        Calculated Cost: ¥{(selectedOrder?.qty * (formData.storage_days || 0) * 1.5).toFixed(2)} (Estimated)
-                                    </p>
-                                </div>
+                                {/* -------------------------------------------------------
+                                    REMOVED: Storage Simulation Block (As per Request)
+                                    Manager confirmed Storage Days come from SAP backend.
+                                    -------------------------------------------------------
+                                */}
                             </div>
                         </div>
                         {!isViewOnly && (
@@ -303,17 +293,16 @@ export default function InboundPage({ data, onSubmit, allActivities = [], allFin
                         )}
                     </TabsContent>
 
-                    {/* TAB 2 & 3 KEPT SIMPLE AS REQUESTED */}
                     <TabsContent value="activity">
-                         <div className="border rounded-md">
-                            <Table>
-                                <TableHeader><TableRow><TableHead>Timestamp</TableHead><TableHead>Activity</TableHead><TableHead>Operator</TableHead></TableRow></TableHeader>
-                                <TableBody>
-                                    {currentActivities.length === 0 ? <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No activity logs found.</TableCell></TableRow> : 
-                                    currentActivities.map((act, i) => (<TableRow key={i}><TableCell>{act.timestamp}</TableCell><TableCell>{act.activity}</TableCell><TableCell>{act.operator}</TableCell></TableRow>))}
-                                </TableBody>
-                            </Table>
-                         </div>
+                          <div className="border rounded-md">
+                             <Table>
+                                 <TableHeader><TableRow><TableHead>Timestamp</TableHead><TableHead>Activity</TableHead><TableHead>Operator</TableHead></TableRow></TableHeader>
+                                 <TableBody>
+                                     {currentActivities.length === 0 ? <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No activity logs found.</TableCell></TableRow> : 
+                                     currentActivities.map((act, i) => (<TableRow key={i}><TableCell>{act.timestamp}</TableCell><TableCell>{act.activity}</TableCell><TableCell>{act.operator}</TableCell></TableRow>))}
+                                 </TableBody>
+                             </Table>
+                          </div>
                     </TabsContent>
 
                     <TabsContent value="financials">
